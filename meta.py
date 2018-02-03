@@ -168,9 +168,9 @@ class MetaLearner(nn.Module):
 		dummy_loss.backward()
 		self.optimizer.step()
 
-		# we don't need to remove the hook actually.
-		# for h in hooks:
-		# 	h.remove()
+		# if you do NOT remove the hook, the GPU memory will expode!!!
+		for h in hooks:
+			h.remove()
 
 	def forward(self, support_x, support_y, query_x, query_y):
 		"""
@@ -189,11 +189,10 @@ class MetaLearner(nn.Module):
 
 		# support_x[i]: [setsz, c_, h, w]
 		# we do different learning task sequentially, not parallel.
-		dummy_loss = None
 		accs = []
 		# for each task/episode.
 		for i in range(meta_batchsz):
-			dummy_loss, grad_pi, episode_acc = self.learner(support_x[i], support_y[i], query_x[i], query_y[i], self.num_updates)
+			_, grad_pi, episode_acc = self.learner(support_x[i], support_y[i], query_x[i], query_y[i], self.num_updates)
 			accs.append(episode_acc)
 			if sum_grads_pi is None:
 				sum_grads_pi = grad_pi
@@ -213,6 +212,14 @@ class MetaLearner(nn.Module):
 		return accs
 
 	def pred(self, support_x, support_y, query_x, query_y):
+		"""
+		predict for query_x
+		:param support_x:
+		:param support_y:
+		:param query_x:
+		:param query_y:
+		:return:
+		"""
 		meta_batchsz = support_y.size(0)
 
 		accs = []
