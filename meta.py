@@ -7,7 +7,6 @@ from torch.nn import functional as F
 import numpy as np
 
 
-
 class Learner(nn.Module):
 	"""
 	This is a learner class, which will accept a specific network module, such as OmniNet that define the network forward
@@ -18,6 +17,7 @@ class Learner(nn.Module):
 	For learner class, it will be responsible for update for several steps on meta-train set and return with the loss on
 	meta-test set.
 	"""
+
 	def __init__(self, net_cls, *args):
 		"""
 		It will receive a class: net_cls and its parameters: args for net_cls.
@@ -44,7 +44,6 @@ class Learner(nn.Module):
 		:return:
 		"""
 		return self.net.parameters()
-
 
 	def update_pi(self):
 		"""
@@ -115,10 +114,12 @@ class MetaLearner(nn.Module):
 	on theta_pi network, and it will merage all loss and then sum over it. The summed loss will be backproped on theta
 	network to update theta parameters, which is the initialization point we want to find.
 	"""
-	def __init__(self, net_cls, n_way,  k_shot, meta_batchsz, beta, num_updates):
+
+	def __init__(self, net_cls, net_cls_args, n_way, k_shot, meta_batchsz, beta, num_updates):
 		"""
 
 		:param net_cls: class, not instance. the class of specific Network for learner
+		:param net_cls_args: tuple, args for net_cls, like (n_way, imgsz)
 		:param n_way:
 		:param k_shot:
 		:param meta_batchsz: number of tasks/episode
@@ -135,10 +136,9 @@ class MetaLearner(nn.Module):
 		self.num_updates = num_updates
 
 		# it will contains a learner class to learn on episodes and gather the loss together.
-		self.learner = Learner(net_cls, n_way)
+		self.learner = Learner(net_cls, *net_cls_args)
 		# the optimizer is to update theta parameters, not theta_pi parameters.
 		self.optimizer = optim.Adam(self.learner.parameters(), lr=beta)
-
 
 	def write_grads(self, dummy_loss, sum_grads_pi):
 		"""
@@ -154,13 +154,14 @@ class MetaLearner(nn.Module):
 		# with our grads accumulated across the meta-batch
 		hooks = []
 
-		for i,v in enumerate(self.learner.parameters()):
+		for i, v in enumerate(self.learner.parameters()):
 			def closure():
 				ii = i
-				return lambda grad : sum_grads_pi[ii]
+				return lambda grad: sum_grads_pi[ii]
+
 			# if you write: hooks.append( v.register_hook(lambda grad : sum_grads_pi[i]) )
 			# it will pop an ERROR, i don't know why?
-			hooks.append( v.register_hook(closure()) )
+			hooks.append(v.register_hook(closure()))
 
 		# use our sumed gradients_pi to update the theta/net network,
 		# since our optimizer receive the self.net.parameters() only.
@@ -176,7 +177,7 @@ class MetaLearner(nn.Module):
 		"""
 		Here we receive a series of episode, each episode will be learned by learner and get a loss on parameters theta.
 		we gather the loss and sum all the loss and then update theta network.
-		setsz = n_way * k_shot
+		setsz = n_way * k_shotf
 		querysz = n_way * k_shot
 		:param support_x: [meta_batchsz, setsz, c_, h, w]
 		:param support_y: [meta_batchsz, setsz]
@@ -196,9 +197,8 @@ class MetaLearner(nn.Module):
 			accs.append(episode_acc)
 			if sum_grads_pi is None:
 				sum_grads_pi = grad_pi
-			else: # accumulate all gradients from different episode learner
-				sum_grads_pi  = [torch.add(i,j) for i,j in zip(sum_grads_pi, grad_pi)]
-
+			else:  # accumulate all gradients from different episode learner
+				sum_grads_pi = [torch.add(i, j) for i, j in zip(sum_grads_pi, grad_pi)]
 
 		# As we already have the grads to update
 		# We use a dummy forward / backward pass to get the correct grads into self.net
@@ -230,4 +230,3 @@ class MetaLearner(nn.Module):
 			accs.append(episode_acc)
 
 		return np.array(accs).mean()
-

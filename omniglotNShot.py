@@ -56,7 +56,7 @@ class OmniglotNShot():
 		self.n_cls = self.x.shape[0]  # 1623
 		self.n_way = n_way  # n way
 		self.k_shot = k_shot  # k shot
-		self.k_query = k_query # k query
+		self.k_query = k_query  # k query
 
 		# save pointer of current read batch in total cache
 		self.indexes = {"train": 0, "test": 0}
@@ -65,9 +65,6 @@ class OmniglotNShot():
 
 		self.datasets_cache = {"train": self.load_data_cache(self.datasets["train"]),  # current epoch data cached
 		                       "test": self.load_data_cache(self.datasets["test"])}
-
-
-
 
 	def normalization(self):
 		"""
@@ -110,10 +107,10 @@ class OmniglotNShot():
 			query_y = np.zeros((self.batchsz, querysz), dtype=np.int)
 
 			for i in range(self.batchsz):  # one batch means one set
-				shuffle_idx = np.arange(self.n_way) # [0,1,2,3,4]
-				np.random.shuffle(shuffle_idx) # [2,4,1,0,3]
-				shuffle_idx_test = np.arange(self.n_way) # [0,1,2,3,4]
-				np.random.shuffle(shuffle_idx_test) # [2,0,1,4,3]
+				shuffle_idx = np.arange(self.n_way)  # [0,1,2,3,4]
+				np.random.shuffle(shuffle_idx)  # [2,4,1,0,3]
+				shuffle_idx_test = np.arange(self.n_way)  # [0,1,2,3,4]
+				np.random.shuffle(shuffle_idx_test)  # [2,0,1,4,3]
 				selected_cls = np.random.choice(data_pack.shape[0], self.n_way, False)
 
 				for j, cur_class in enumerate(selected_cls):  # for each selected cls
@@ -126,12 +123,12 @@ class OmniglotNShot():
 						# i: batch idx
 						# cur_class: cls in n_way
 						support_x[i, shuffle_idx[j] * self.k_shot + offset, ...] = data_pack[cur_class][img]
-						support_y[i, shuffle_idx[j] * self.k_shot + offset] = j # relative indexing
+						support_y[i, shuffle_idx[j] * self.k_shot + offset] = j  # relative indexing
 
 					# meta-test, treat following k_query imgs as query imgs
 					for offset, img in enumerate(selected_imgs[self.k_shot:]):
 						query_x[i, shuffle_idx_test[j] * self.k_query + offset, ...] = data_pack[cur_class][img]
-						query_y[i, shuffle_idx_test[j] * self.k_query + offset] = j # relative indexing
+						query_y[i, shuffle_idx_test[j] * self.k_query + offset] = j  # relative indexing
 
 			data_cache.append([support_x, support_y, query_x, query_y])
 		return data_cache
@@ -150,7 +147,7 @@ class OmniglotNShot():
 		next_batch = self.datasets_cache[mode][self.indexes[mode]]
 		self.indexes[mode] += 1
 
-		return  next_batch
+		return next_batch
 
 	def get_batch(self, mode):
 
@@ -160,7 +157,7 @@ class OmniglotNShot():
 		"""
 		x_support_set, y_support_set, x_target, y_target = self.__get_batch(mode)
 
-		k = int(np.random.uniform(low=0, high=4)) # 0 - 3
+		k = int(np.random.uniform(low=0, high=4))  # 0 - 3
 		# Iterate over the sequence. Extract batches.
 
 		for i in np.arange(x_support_set.shape[0]):
@@ -172,8 +169,6 @@ class OmniglotNShot():
 			x_target[i, :, :, :, :] = self.__rotate_batch(x_target[i, :, :, :, :], k)
 
 		return x_support_set, y_support_set, x_target, y_target
-
-
 
 	def __rotate_batch(self, batch_images, k):
 		"""
@@ -208,8 +203,8 @@ if __name__ == '__main__':
 		print(support_y[0])
 		print(query_y[0])
 		# [b, setsz, h, w, c] => [b, setsz, c, w, h] => [b, setsz, 3c, w, h]
-		support_x = torch.from_numpy(support_x).float().transpose(2,4).repeat(1,1,3,1,1)
-		query_x = torch.from_numpy(query_x).float().transpose(2,4).repeat(1,1,3,1,1)
+		support_x = torch.from_numpy(support_x).float().transpose(2, 4).repeat(1, 1, 3, 1, 1)
+		query_x = torch.from_numpy(query_x).float().transpose(2, 4).repeat(1, 1, 3, 1, 1)
 		support_y = torch.from_numpy(support_y).float()  # [batch, setsz, 1]
 		query_y = torch.from_numpy(query_y).float()
 		batchsz, setsz, c, h, w = support_x.size()
@@ -229,6 +224,5 @@ if __name__ == '__main__':
 
 		set_ = db.get_batch('train')
 		time.sleep(10)
-
 
 	tb.close()
