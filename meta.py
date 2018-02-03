@@ -4,12 +4,14 @@ from torch import optim
 from torch import autograd
 from torch.autograd import Variable
 from torch.nn import functional as F
+import numpy as np
+
 
 
 class Learner(nn.Module):
 	"""
-	This is a learner class, which will accept a specific network module, such as OmniNet where define the network forward
-	process. Learner class will create two same network, one as theta network and the other act as theta_pi network.
+	This is a learner class, which will accept a specific network module, such as OmniNet that define the network forward
+	process. Learner class will create two same network, one as theta network and the other acts as theta_pi network.
 	for each episode, the theta_pi network will copy its initial parameters from theta network and update several steps
 	by meta-train set and then calculate its loss on meta-test set. All loss on meta-test set will be sumed together and
 	then backprop on theta network, which should be done on metalaerner class.
@@ -30,7 +32,7 @@ class Learner(nn.Module):
 		self.net = net_cls(*args)
 		# you must call create_pi_net to create pi network additionally
 		self.net_pi = net_cls(*args)
-		# update theta_pi = theta - lr * grad
+		# update theta_pi = theta_pi - lr * grad
 		# according to the paper, here we use naive version of SGD to update theta_pi
 		# 0.1 here means the learner_lr
 		self.optimizer = optim.SGD(self.net_pi.parameters(), 0.1)
@@ -58,11 +60,11 @@ class Learner(nn.Module):
 	def forward(self, support_x, support_y, query_x, query_y, num_updates):
 		"""
 		learn on current episode meta-train: support_x & support_y and then calculate loss on meta-test set: query_x&y
-		:param support_x:
-		:param support_y:
-		:param query_x:
-		:param query_y:
-		:param num_updates:
+		:param support_x: [setsz, c_, h, w]
+		:param support_y: [setsz]
+		:param query_x:   [querysz, c_, h, w]
+		:param query_y:   [querysz]
+		:param num_updates: 5
 		:return:
 		"""
 		# now try to fine-tune from current $theta$ parameters -> $theta_pi$
@@ -88,12 +90,23 @@ class Learner(nn.Module):
 		acc = correct / query_y.size(0)
 
 		# gradient for validation on theta_pi
-		# after call autorad.grad, you can not call backward again except set create_graph = True
+		# after call autorad.grad, you can not call backward again except for setting create_graph = True
 		# as we will use the loss as dummpy loss to conduct a dummy backprop to write our gradients to theta network,
 		# here we set create_graph to true to support second time backward.
 		grads_pi = autograd.grad(loss, self.net_pi.parameters(), create_graph=True)
 
 		return loss, grads_pi, acc
+
+	def net_forward(self, support_x, support_y):
+		"""
+		This function is purely for updating net network. In metalearner, we need the get the loss op from net network
+		to write our merged gradients into net network, hence will call this function to get a dummy loss op.
+		:param support_x: [setsz, c, h, w]
+		:param support_y: [sessz, c, h, w]
+		:return: dummy loss and dummy pred
+		"""
+		loss, pred = self.net(support_x, support_y)
+		return loss, pred
 
 
 class MetaLearner(nn.Module):
@@ -123,6 +136,7 @@ class MetaLearner(nn.Module):
 
 		# it will contains a learner class to learn on episodes and gather the loss together.
 		self.learner = Learner(net_cls, n_way)
+		# the optimizer is to update theta parameters, not theta_pi parameters.
 		self.optimizer = optim.Adam(self.learner.parameters(), lr=beta)
 
 
@@ -135,11 +149,18 @@ class MetaLearner(nn.Module):
 		:param sum_grads_pi: the summed gradients
 		:return:
 		"""
+
 		# Register a hook on each parameter in the net that replaces the current dummy grad
 		# with our grads accumulated across the meta-batch
 		hooks = []
+
 		for i,v in enumerate(self.learner.parameters()):
-			hooks.append( v.register_hook(lambda grad: sum_grads_pi[i]) )
+			def closure():
+				ii = i
+				return lambda grad : sum_grads_pi[ii]
+			# if you write: hooks.append( v.register_hook(lambda grad : sum_grads_pi[i]) )
+			# it will pop an ERROR, i don't know why?
+			hooks.append( v.register_hook(closure()) )
 
 		# use our sumed gradients_pi to update the theta/net network,
 		# since our optimizer receive the self.net.parameters() only.
@@ -148,8 +169,8 @@ class MetaLearner(nn.Module):
 		self.optimizer.step()
 
 		# we don't need to remove the hook actually.
-		for h in hooks:
-			h.remove()
+		# for h in hooks:
+		# 	h.remove()
 
 	def forward(self, support_x, support_y, query_x, query_y):
 		"""
@@ -170,6 +191,7 @@ class MetaLearner(nn.Module):
 		# we do different learning task sequentially, not parallel.
 		dummy_loss = None
 		accs = []
+		# for each task/episode.
 		for i in range(meta_batchsz):
 			dummy_loss, grad_pi, episode_acc = self.learner(support_x[i], support_y[i], query_x[i], query_y[i], self.num_updates)
 			accs.append(episode_acc)
@@ -183,9 +205,22 @@ class MetaLearner(nn.Module):
 		# We use a dummy forward / backward pass to get the correct grads into self.net
 		# the right grads will be updated by hook, ignoring backward.
 		# use hook mechnism to write sumed gradient into network.
+		# we need to update the theta/net network, we need a op from net network, so we call self.learner.net_forward
+		# to get the op from net network, since the loss from self.learner.forward will return loss from net_pi network.
+		dummy_loss, _ = self.learner.net_forward(support_x[0], support_y[0])
 		self.write_grads(dummy_loss, sum_grads_pi)
 
 		return accs
 
+	def pred(self, support_x, support_y, query_x, query_y):
+		meta_batchsz = support_y.size(0)
 
+		accs = []
+		# for each task/episode.
+		# the learner will copy parameters from current theta network and then fine-tune on support set.
+		for i in range(meta_batchsz):
+			_, _, episode_acc = self.learner(support_x[i], support_y[i], query_x[i], query_y[i], self.num_updates)
+			accs.append(episode_acc)
+
+		return np.array(accs).mean()
 

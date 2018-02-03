@@ -13,8 +13,8 @@ def main():
 
 	meta_batchsz = 32
 	n_way = 5
-	k_shot = 1
-	k_query = 15
+	k_shot = 5
+	k_query = 5
 	meta_lr = 1e-3
 	num_updates = 5
 
@@ -32,11 +32,22 @@ def main():
 
 		# support_x: [meta_batchsz, setsz, 3, imgsz, imgsz]
 		# query_x: [meta_batchsz, querysz, 3, imgsz, imgsz]
+		# print(support_x.size(), support_y, query_x.size(), query_y)
 		accs = meta(support_x, support_y, query_x, query_y)
 		acc = np.array(accs).mean()
-		print(episode_num, acc)
 
 
+		test_accs = []
+		for i in range(10):
+			support_x, support_y, query_x, query_y = db.get_batch('test')
+			support_x = Variable(torch.from_numpy(support_x).float().transpose(2,4).transpose(3, 4).repeat(1,1,3,1,1)).cuda()
+			query_x = Variable(torch.from_numpy(query_x).float().transpose(2,4).transpose(3, 4).repeat(1,1,3,1,1)).cuda()
+			support_y = Variable(torch.from_numpy(support_y).long()).cuda()
+			query_y = Variable(torch.from_numpy(query_y).long()).cuda()
+
+			test_acc = meta.pred(support_x, support_y, query_x, query_y)
+			test_accs.append(test_acc)
+		print(episode_num, acc, np.array(test_accs).mean())
 
 
 

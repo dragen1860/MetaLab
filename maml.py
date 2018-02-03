@@ -7,11 +7,12 @@ from torch.autograd import Variable
 from torch.nn import functional as F
 from utils import *
 from omni import *
+from omniglotNShot import OmniglotNShot
 
 class OmniglotTask:
 
-	def __init__(self, root, n_way, k_shot, mode='train'):
-		self.dataset = 'omniglot'
+	def __init__(self, n_way, k_shot, mode='train'):
+		root = '../data/omniglot/'
 		# Alphabet_of_the_Magi/chapter01/1.jpg
 		self.root = '{}/images_background'.format(root) if mode == 'train' else '{}/images_evaluation'.format(root)
 		self.n_way = n_way
@@ -47,19 +48,16 @@ class OmniglotTask:
 		return os.path.join( * path.split('/')[:-1])
 
 
-
-
-
 class OmniglotNet(nn.Module):
 	'''
 	The base model for few-shot learning on Omniglot
 	'''
 
-	def __init__(self, num_classes, loss_fn, num_in_channels=3):
+	def __init__(self, num_classes):
 		super(OmniglotNet, self).__init__()
 		# Define the network
 		self.features = nn.Sequential(OrderedDict([
-			('conv1', nn.Conv2d(num_in_channels, 64, 3)),
+			('conv1', nn.Conv2d(3, 64, 3)),
 			('bn1', nn.BatchNorm2d(64, momentum=1, affine=True)),
 			('relu1', nn.ReLU(inplace=True)),
 			('pool1', nn.MaxPool2d(2, 2)),
@@ -75,7 +73,7 @@ class OmniglotNet(nn.Module):
 		self.add_module('fc', nn.Linear(64, num_classes))
 
 		# Define loss function
-		self.loss_fn = loss_fn
+		self.loss_fn = nn.CrossEntropyLoss()
 
 		# Initialize weights
 		self._init_weights()
@@ -149,18 +147,11 @@ class InnerLoop(OmniglotNet):
 	then computes and returns a meta-gradient w.r.t. validation data
 	'''
 
-	def __init__(self, num_classes, loss_fn, num_updates, step_size, batch_size, meta_batch_size, num_in_channels=3):
-		super(InnerLoop, self).__init__(num_classes, loss_fn, num_in_channels)
-		# Number of updates to be taken
+	def __init__(self, num_classes, num_updates, step_size, meta_batch_size):
+		super(InnerLoop, self).__init__(num_classes)
+
 		self.num_updates = num_updates
-
-		# Step size for the updates
 		self.step_size = step_size
-
-		# PER CLASS Batch size for the updates
-		self.batch_size = batch_size
-
-		# for loss normalization
 		self.meta_batch_size = meta_batch_size
 
 	def net_forward(self, x, weights=None):
@@ -175,228 +166,139 @@ class InnerLoop(OmniglotNet):
 		loss = self.loss_fn(out, target_var)
 		return loss, out
 
-	def forward(self, task):
-		train_loader = get_data_loader(task, self.batch_size)
-		val_loader = get_data_loader(task, self.batch_size, split='val')
-		##### Test net before training, should be random accuracy ####
-		tr_pre_loss, tr_pre_acc = evaluate(self, train_loader)
-		val_pre_loss, val_pre_acc = evaluate(self, val_loader)
+	def forward(self, support_x, support_y, query_x, query_y):
+
 		fast_weights = OrderedDict((name, param) for (name, param) in self.named_parameters())
+
+
 		for i in range(self.num_updates):
-			in_, target = train_loader.__iter__().next()
 			if i == 0:
-				loss, _ = self.forward_pass(in_, target)
+				loss, _ = self.forward_pass(support_x, support_y)
 				grads = torch.autograd.grad(loss, self.parameters(), create_graph=True)
 			else:
-				loss, _ = self.forward_pass(in_, target, fast_weights)
+				loss, _ = self.forward_pass(support_x, support_y, fast_weights)
 				grads = torch.autograd.grad(loss, fast_weights.values(), create_graph=True)
 			fast_weights = OrderedDict(
 				(name, param - self.step_size * grad) for ((name, param), grad) in zip(fast_weights.items(), grads))
-		##### Test net after training, should be better than random ####
-		tr_post_loss, tr_post_acc = evaluate(self, train_loader, fast_weights)
-		val_post_loss, val_post_acc = evaluate(self, val_loader, fast_weights)
-		# print('train', tr_pre_loss, tr_post_loss, tr_pre_acc, tr_post_acc)
-		# print('val', val_pre_loss, val_post_loss, val_pre_acc, val_post_acc)
+
 
 		# Compute the meta gradient and return it
-		in_, target = val_loader.__iter__().next()
-		loss, _ = self.forward_pass(in_, target, fast_weights)
+		loss, _ = self.forward_pass(query_x, query_y, fast_weights)
 		loss = loss / self.meta_batch_size  # normalize loss
 		grads = torch.autograd.grad(loss, self.parameters())
 		meta_grads = {name: g for ((name, _), g) in zip(self.named_parameters(), grads)}
-		metrics = (tr_post_loss, tr_post_acc, val_post_loss, val_post_acc)
-		return metrics, meta_grads
+		return meta_grads
 
 
 
-
-
-
-
-
-class MetaLearner(object):
-	def __init__(self,
-	             dataset, # ominiglot
-	             num_classes, # n-way
-	             num_inst, # k-shot
-	             meta_batch_size, # 32
- 	             meta_step_size, #  lr
-	             inner_batch_size, # 1
-	             inner_step_size, # lr
-	             num_updates, #  15000
-	             num_inner_updates, # 5
-	             loss_fn): # crossentropy
+class MetaLearner:
+	def __init__(self, n_way,  k_shot,  meta_batchsz,  beta, alpha,  num_updates):
 		super(self.__class__, self).__init__()
-		self.dataset = dataset
-		self.num_classes = num_classes
-		self.num_inst = num_inst
-		self.meta_batch_size = meta_batch_size
-		self.meta_step_size = meta_step_size
-		self.inner_batch_size = inner_batch_size
-		self.inner_step_size = inner_step_size
+		self.n_way = n_way
+		self.k_shot = k_shot
+		self.meta_batchsz = meta_batchsz
+		self.beta = beta
+		self.alpha = alpha
 		self.num_updates = num_updates
-		self.num_inner_updates = num_inner_updates
-		self.loss_fn = loss_fn
 
-		# Make the nets
-		# TODO: don't actually need two nets
-		num_input_channels = 1 if self.dataset == 'mnist' else 3
+		self.db = OmniglotNShot('dataset', batchsz=meta_batchsz, n_way=n_way, k_shot=k_shot, k_query=k_shot, imgsz=28)
 
-		self.net = OmniglotNet(num_classes, self.loss_fn, num_input_channels)
+		self.net = OmniglotNet(n_way)
 		self.net.cuda()
-		self.fast_net = InnerLoop(num_classes, self.loss_fn, self.num_inner_updates, self.inner_step_size,
-		                          self.inner_batch_size, self.meta_batch_size, num_input_channels)
+		self.fast_net = InnerLoop(n_way,num_updates,alpha,meta_batchsz)
 		self.fast_net.cuda()
-		self.opt = torch.optim.Adam(self.net.parameters(), lr=meta_step_size)
+		self.opt = torch.optim.Adam(self.net.parameters(), lr=beta)
 
-	def get_task(self, root, n_cl, n_inst, split='train'):
-		return OmniglotTask(root, n_cl, n_inst, split)
 
 	def meta_update(self, task, ls):
 
-		loader = get_data_loader(task, self.inner_batch_size, split='val')
-		in_, target = loader.__iter__().next()
+
+		support_x, support_y, query_x, query_y = self.db.get_batch('test')
+		support_x = torch.from_numpy(support_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)
+		query_x = torch.from_numpy(query_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)
+		support_y = torch.from_numpy(support_y).long()
+		query_y = torch.from_numpy(query_y).long()
+
 		# We use a dummy forward / backward pass to get the correct grads into self.net
-		loss, out = forward_pass(self.net, in_, target)
+		loss, out = forward_pass(self.net, support_x[0], support_y[0])
 		# Unpack the list of grad dicts
 		gradients = {k: sum(d[k] for d in ls) for k in ls[0].keys()}
 		# Register a hook on each parameter in the net that replaces the current dummy grad
 		# with our grads accumulated across the meta-batch
 		hooks = []
+
 		for (k, v) in self.net.named_parameters():
 			def get_closure():
 				key = k
-
-				def replace_grad(grad):
-					return gradients[key]
-
-				return replace_grad
+				return lambda grad:gradients[key]
 
 			hooks.append(v.register_hook(get_closure()))
-		# Compute grads for current step, replace with summed gradients as defined by hook
+
 		self.opt.zero_grad()
 		loss.backward()
-		# Update the net parameters with the accumulated gradient according to optimizer
 		self.opt.step()
-		# Remove the hooks before next training phase
+
+
 		for h in hooks:
 			h.remove()
 
 	def test(self):
-		num_in_channels = 1 if self.dataset == 'mnist' else 3
 
-		test_net = OmniglotNet(self.num_classes, self.loss_fn, num_in_channels)
-		mtr_loss, mtr_acc, mval_loss, mval_acc = 0.0, 0.0, 0.0, 0.0
+		test_net = OmniglotNet(self.n_way)
+		mval_acc = 0.0
 
-		# Select ten tasks randomly from the test set to evaluate on
-		for _ in range(10):
+		support_x, support_y, query_x, query_y = self.db.get_batch('test')
+		support_x = torch.from_numpy(support_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)
+		query_x = torch.from_numpy(query_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)
+		support_y = torch.from_numpy(support_y).long()
+		query_y = torch.from_numpy(query_y).long()
+
+		for meta_batchidx in range(support_y.size(0)):
 			# Make a test net with same parameters as our current net
 			test_net.copy_weights(self.net)
 			test_net.cuda()
-			test_opt = torch.optim.SGD(test_net.parameters(), lr=self.inner_step_size)
-			task = self.get_task('../data/{}'.format(self.dataset), self.num_classes, self.num_inst, split='test')
-			# Train on the train examples, using the same number of updates as in training
-			train_loader = get_data_loader(task, self.inner_batch_size, split='train')
-			for i in range(self.num_inner_updates):
-				in_, target = train_loader.__iter__().next()
-				loss, _ = forward_pass(test_net, in_, target)
+
+			test_opt = torch.optim.SGD(test_net.parameters(), lr=self.alpha)
+
+			for i in range(self.num_updates):
+				loss, _ = forward_pass(test_net, support_x[meta_batchidx], support_y[meta_batchidx])
 				test_opt.zero_grad()
 				loss.backward()
 				test_opt.step()
-			# Evaluate the trained model on train and val examples
-			tloss, tacc = evaluate(test_net, train_loader)
-			val_loader = get_data_loader(task, self.inner_batch_size, split='val')
-			vloss, vacc = evaluate(test_net, val_loader)
-			mtr_loss += tloss
-			mtr_acc += tacc
-			mval_loss += vloss
+
+			vloss, vacc = evaluate(test_net, query_x[meta_batchidx], query_y[meta_batchidx])
 			mval_acc += vacc
 
-		mtr_loss = mtr_loss / 10
-		mtr_acc = mtr_acc / 10
-		mval_loss = mval_loss / 10
-		mval_acc = mval_acc / 10
+		mval_acc = mval_acc / support_y.size(0)
+		print(mval_acc)
 
-		print('Meta train:', mtr_loss, mtr_acc)
-		print('Meta val:', mval_loss, mval_acc)
-		del test_net
-		return mtr_loss, mtr_acc, mval_loss, mval_acc
 
-	def _train(self, exp):
-		''' debugging function: learn two tasks '''
-		task1 = self.get_task('../data/{}'.format(self.dataset), self.num_classes, self.num_inst)
-		task2 = self.get_task('../data/{}'.format(self.dataset), self.num_classes, self.num_inst)
-		for it in range(self.num_updates):
+	def train(self):
+
+		for it in range(15000): # 15000
+			self.test()
+
+			support_x, support_y, query_x, query_y = self.db.get_batch('train')
+			support_x = torch.from_numpy(support_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)
+			query_x = torch.from_numpy(query_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)
+			support_y = torch.from_numpy(support_y).long()
+			query_y = torch.from_numpy(query_y).long()
+
+
 			grads = []
-			for task in [task1, task2]:
-				# Make sure fast net always starts with base weights
+			for i in range(self.meta_batchsz): # 32
+
+				task = OmniglotTask(self.n_way, self.k_shot, mode='train')
 				self.fast_net.copy_weights(self.net)
-				_, g = self.fast_net.forward(task)
-				grads.append(g)
+
+				grads.append(self.fast_net.forward(support_x[i], support_y[i], query_x[i], query_y[i]))
+
 			self.meta_update(task, grads)
-
-	def train(self, exp):
-		tr_loss, tr_acc, val_loss, val_acc = [], [], [], []
-		mtr_loss, mtr_acc, mval_loss, mval_acc = [], [], [], []
-		for it in range(self.num_updates): # 15000
-			# Evaluate on test tasks
-			mt_loss, mt_acc, mv_loss, mv_acc = self.test()
-			mtr_loss.append(mt_loss)
-			mtr_acc.append(mt_acc)
-			mval_loss.append(mv_loss)
-			mval_acc.append(mv_acc)
-
-			# Collect a meta batch update
-			grads = []
-			tloss, tacc, vloss, vacc = 0.0, 0.0, 0.0, 0.0
-			for i in range(self.meta_batch_size): # 32
-				task = self.get_task('../data/{}'.format(self.dataset), self.num_classes, self.num_inst)
-				self.fast_net.copy_weights(self.net)
-				metrics, g = self.fast_net.forward(task)
-				(trl, tra, vall, vala) = metrics
-				grads.append(g)
-				tloss += trl
-				tacc += tra
-				vloss += vall
-				vacc += vala
-
-			# Perform the meta update
-			print('Meta update:', it)
-			self.meta_update(task, grads)
-
-			# Save a model snapshot every now and then
-			if it % 500 == 0:
-				torch.save(self.net.state_dict(), '../output/{}/train_iter_{}.pth'.format(exp, it))
-
-			# Save stuff
-			tr_loss.append(tloss / self.meta_batch_size)
-			tr_acc.append(tacc / self.meta_batch_size)
-			val_loss.append(vloss / self.meta_batch_size)
-			val_acc.append(vacc / self.meta_batch_size)
 
 
 def main():
-	exp='maml-omniglot-5way-1shot-TEST'
-	dataset='omniglot'
-	num_cls=20
-	num_inst=5
-	batch=5
-	m_batch=32
-	num_updates=15000
-	num_inner_updates=5
-	lr=1e-1
-	meta_lr=1e-3
-
-	# make output dir
-	output = '../output/{}'.format(exp)
-	try:
-		os.makedirs(output)
-	except:
-		pass
-
-	loss_fn = nn.CrossEntropyLoss()
-	learner = MetaLearner(dataset, num_cls, num_inst, m_batch, meta_lr, batch, lr, num_updates,num_inner_updates, loss_fn)
-	learner.train(exp)
+	learner = MetaLearner(n_way=5,k_shot=5,meta_batchsz=32,beta=1e-3,alpha=1e-1,num_updates=5)
+	learner.train()
 
 
 if __name__ == '__main__':

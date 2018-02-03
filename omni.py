@@ -91,7 +91,7 @@ class ClassBalancedSampler(Sampler):
 		return 1
 
 
-def get_data_loader(task, batch_size=1, split='train'):
+def get_data_loader(task, split='train'):
 	# NOTE: batch size here is # instances PER CLASS
 
 	dset = Omniglot(task, transform=transforms.Compose([
@@ -99,6 +99,6 @@ def get_data_loader(task, batch_size=1, split='train'):
 					transforms.Normalize(mean=[0.92206, 0.92206, 0.92206], std=[0.08426, 0.08426, 0.08426])]),
 				                split=split)
 
-	sampler = ClassBalancedSampler(task.n_way, task.k_shot, batch_cutoff=(None if split != 'train' else batch_size))
-	loader = DataLoader(dset, batch_size=batch_size * task.n_way, sampler=sampler, num_workers=1, pin_memory=True)
+	sampler = ClassBalancedSampler(task.n_way, task.k_shot, batch_cutoff=(None if split != 'train' else 1))
+	loader = DataLoader(dset, batch_size=task.n_way*task.k_shot)
 	return loader
