@@ -8,7 +8,7 @@ Model-Agnostic Meta-Learning (MAML): https://arxiv.org/abs/1703.03400
 
 ## Howto
 change `dataset = 'omniglot' ` in `main.py` and just run `python main.py`, the program will download omniglot dataset automatically.
-
+modify the value of `meta_batchsz` to fit your GPU memory size.
 
 ## benchmark
 | Model                               	| Fine Tune 	| 5-way Acc.    	|               	| 20-way Acc   	|               	|
@@ -20,15 +20,17 @@ change `dataset = 'omniglot' ` in `main.py` and just run `python main.py`, the p
 | MAML                                	| Y         	| 98.7+-0.4%    	| 99.9+-0.1%    	| 95.8+-0.3%   	| 98.9+-0.2%    	|
 | **Ours**                             	| Y         	| -    				| 99.52%        	| -   			| -    				|
 
+
 >5-way 5-shot episode: 27180*128 	finetune acc:0.995625 		test acc:0.995219
 >
 
-
+## training curve
+![test acc](res/test-acc.png)
 
 
 # mini-Imagenet
 
-## dataset
+## Howto
 
 download `mini-imagenet` dataset and make it looks like:
 ```shell
