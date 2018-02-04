@@ -11,13 +11,13 @@ from torch.utils.data import DataLoader
 
 
 def main():
-	meta_batchsz = 128
+	meta_batchsz = 512
 	n_way = 5
-	k_shot = 5
+	k_shot = 1
 	k_query = k_shot
 	meta_lr = 1e-3
 	num_updates = 5
-	dataset = 'mini-imagenet' #'omniglot'  #
+	dataset = 'omniglot'  #'mini-imagenet' #
 
 
 
