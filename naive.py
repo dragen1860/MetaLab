@@ -32,7 +32,7 @@ class Naive(nn.Module):
 			                         nn.BatchNorm2d(64),
 			                         nn.ReLU(inplace=True),
 
-			                         nn.MaxPool2d(5,3)
+			                         nn.MaxPool2d(3,2)
 
 			                         )
 		else: # for omniglot

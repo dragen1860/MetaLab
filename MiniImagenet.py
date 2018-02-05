@@ -172,10 +172,11 @@ class MiniImagenet(Dataset):
 		query_y_idx = torch.from_numpy(np.array(query_y_idx))
 		support_y_idx = torch.from_numpy(np.array(support_y_idx))
 
-		# print('global indexing:')
-		# print(support_y, query_y)
-		# print('local indexing:')
-		# print(support_y_idx.numpy(), query_y_idx.numpy())
+		# if np.random.randint(1000)< 1:
+		# 	print('global indexing:')
+		# 	print(support_y, query_y)
+		# 	print('local indexing:')
+		# 	print(support_y_idx.numpy(), query_y_idx.numpy())
 
 		return support_x, support_y_idx, query_x, query_y_idx
 

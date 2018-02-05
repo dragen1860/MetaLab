@@ -157,7 +157,7 @@ class MetaLearner(nn.Module):
 		for i, v in enumerate(self.learner.parameters()):
 			def closure():
 				ii = i
-				return lambda grad: sum_grads_pi[ii]
+				return lambda grad: torch.clamp(sum_grads_pi[ii], -1, 1)
 
 			# if you write: hooks.append( v.register_hook(lambda grad : sum_grads_pi[i]) )
 			# it will pop an ERROR, i don't know why?

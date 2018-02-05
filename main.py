@@ -17,7 +17,7 @@ def main():
 	k_query = k_shot
 	meta_lr = 1e-3
 	num_updates = 5
-	dataset = 'mini-imagenet' # 'omniglot
+	dataset = 'omniglot'
 
 
 
@@ -96,6 +96,8 @@ def main():
 					support_y = Variable(batch_test[1]).cuda()
 					query_x = Variable(batch_test[2]).cuda()
 					query_y = Variable(batch_test[3]).cuda()
+ 
+
 				# get accuracy
 				test_acc = meta.pred(support_x, support_y, query_x, query_y)
 				test_accs.append(test_acc)

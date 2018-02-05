@@ -21,17 +21,21 @@ modify the value of `meta_batchsz` to fit your GPU memory size.
 | **Ours**                             	| Y         	| 98.62%     		| 99.52%        	| 96.09%   		| 98.24%    				|
 
 
->5way 1shot episode: 11580*512 	finetune acc:0.990234 		test acc:0.986250
+>5way 1shot episode: 11580\*512 	finetune acc:0.990234 		test acc:0.986250
+
 >5way 5shot episode: 27180\*128 	finetune acc:0.995625 		test acc:0.995219
+
 >20way 1shot episode: 23160\*128 	finetune acc:0.960937 		test acc:0.960898
->20way 5shot episode: 11580*32 	finetune acc:0.985938 		test acc:0.982437
+
+>20way 5shot episode: 11580\*32 	finetune acc:0.985938 		test acc:0.982437
 
 
 ## training curve
 ![test acc](res/test-acc.png)
 
 
-# mini-Imagenet
+
+# ~~mini-Imagenet~~ (CAN NOT WORK!)
 
 > train `mini-imagenet` is extremely slow, since the code train task one by one squentially.
 
