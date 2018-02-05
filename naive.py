@@ -13,33 +13,54 @@ class Naive(nn.Module):
 	def __init__(self, n_way, imgsz):
 		super(Naive, self).__init__()
 
-		self.net = nn.Sequential(nn.Conv2d(3, 64, kernel_size=3),
-		                         nn.AvgPool2d(kernel_size=2),
-		                         nn.BatchNorm2d(64),
-		                         nn.ReLU(inplace=True),
+		if imgsz > 28: # for mini-imagenet
+			self.net = nn.Sequential(nn.Conv2d(3, 64, kernel_size=3),
+			                         nn.AvgPool2d(kernel_size=2),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
 
-		                         nn.Conv2d(64, 64, kernel_size=3),
-		                         nn.AvgPool2d(kernel_size=2),
-		                         nn.BatchNorm2d(64),
-		                         nn.ReLU(inplace=True),
+			                         nn.Conv2d(64, 64, kernel_size=3),
+			                         nn.AvgPool2d(kernel_size=2),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
 
-		                         nn.Conv2d(64, 64, kernel_size=3),
-		                         nn.BatchNorm2d(64),
-		                         nn.ReLU(inplace=True),
+			                         nn.Conv2d(64, 64, kernel_size=3),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
 
-		                         nn.Conv2d(64, 64, kernel_size=3),
-		                         nn.BatchNorm2d(64),
-		                         nn.ReLU(inplace=True),
+			                         nn.Conv2d(64, 64, kernel_size=3),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
 
-		                         nn.MaxPool2d(5,3)
-		                         )
+			                         nn.MaxPool2d(5,3)
+
+			                         )
+		else: # for omniglot
+			self.net = nn.Sequential(nn.Conv2d(3, 64, kernel_size=3),
+			                         nn.AvgPool2d(kernel_size=2),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
+
+			                         nn.Conv2d(64, 64, kernel_size=3),
+			                         nn.AvgPool2d(kernel_size=2),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
+
+			                         nn.Conv2d(64, 64, kernel_size=3),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True),
+
+			                         nn.Conv2d(64, 64, kernel_size=3),
+			                         nn.BatchNorm2d(64),
+			                         nn.ReLU(inplace=True)
+
+			                         )
 
 		# dummy forward to get feature size
 		dummy_img = Variable(torch.randn(2, 3, imgsz, imgsz))
 		repsz = self.net(dummy_img).size()
 		_, c, h, w = repsz
 		self.fc_dim = c * h * w
-
 
 		self.fc = nn.Sequential(nn.Linear(self.fc_dim, 64),
 		                        nn.ReLU(inplace=True),

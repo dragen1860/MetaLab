@@ -77,7 +77,7 @@ def main():
 		# 2. test
 		if episode_num % 30 == 0:
 			test_accs = []
-			for i in range(min(episode_num // 1000 + 1, 10)): # get average acc.
+			for i in range(min(episode_num // 5000 + 3, 10)): # get average acc.
 				if dataset == 'omniglot':
 					support_x, support_y, query_x, query_y = db.get_batch('test')
 					support_x = Variable( torch.from_numpy(support_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)).cuda()
