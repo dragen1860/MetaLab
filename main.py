@@ -11,13 +11,13 @@ from torch.utils.data import DataLoader
 
 
 def main():
-	meta_batchsz = 512
+	meta_batchsz = 32
 	n_way = 5
 	k_shot = 1
 	k_query = k_shot
 	meta_lr = 1e-3
 	num_updates = 5
-	dataset = 'omniglot'  #'mini-imagenet' #
+	dataset = 'mini-imagenet' # 'omniglot
 
 
 
@@ -32,7 +32,7 @@ def main():
 		# for mini-imagenet, it should have two dataloader, one is train_loader and another is test_loader.
 		mini = MiniImagenet('../mini-imagenet/', mode='train', n_way=n_way, k_shot=k_shot, k_query=k_query,
 		                    batchsz=10000, resize=imgsz)
-		db = DataLoader(mini, meta_batchsz, shuffle=True, num_workers=2, pin_memory=True)
+		db = DataLoader(mini, meta_batchsz, shuffle=True, num_workers=4, pin_memory=True)
 		mini_test = MiniImagenet('../mini-imagenet/', mode='test', n_way=n_way, k_shot=k_shot, k_query=k_query,
 		                    batchsz=1000, resize=imgsz)
 		db_test = DataLoader(mini_test, meta_batchsz, shuffle=True, num_workers=2, pin_memory=True)
@@ -61,9 +61,9 @@ def main():
 			try:
 				batch_test = iter(db).next()
 			except StopIteration as err:
-				mini = MiniImagenet('../mini-imagenet/', mode='test', n_way=n_way, k_shot=k_shot, k_query=k_query,
+				mini = MiniImagenet('../mini-imagenet/', mode='train', n_way=n_way, k_shot=k_shot, k_query=k_query,
 				                    batchsz=10000, resize=imgsz)
-				db = DataLoader(mini, meta_batchsz, shuffle=True, num_workers=2, pin_memory=True)
+				db = DataLoader(mini, meta_batchsz, shuffle=True, num_workers=4, pin_memory=True)
 
 			support_x = Variable(batch_test[0]).cuda()
 			support_y = Variable(batch_test[1]).cuda()
@@ -75,9 +75,9 @@ def main():
 		train_acc = np.array(accs).mean()
 
 		# 2. test
-		if episode_num % 20 == 0:
+		if episode_num % 30 == 0:
 			test_accs = []
-			for i in range(10):
+			for i in range(min(episode_num // 1000 + 1, 10)): # get average acc.
 				if dataset == 'omniglot':
 					support_x, support_y, query_x, query_y = db.get_batch('test')
 					support_x = Variable( torch.from_numpy(support_x).float().transpose(2, 4).transpose(3, 4).repeat(1, 1, 3, 1, 1)).cuda()

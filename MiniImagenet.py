@@ -107,7 +107,7 @@ class MiniImagenet(Dataset):
 			np.random.shuffle(selected_cls)
 			support_x = []
 			query_x = []
-			for cls in selected_cls:
+			for idx, cls in enumerate(selected_cls):
 				# 2. select k_shot + k_query for each class
 				selected_imgs_idx = np.random.choice(len(self.data[cls]), self.k_shot + self.k_query, False)
 				np.random.shuffle(selected_imgs_idx)
@@ -154,9 +154,30 @@ class MiniImagenet(Dataset):
 
 		for i, path in enumerate(flatten_query_x):
 			query_x[i] = self.transform(path)
-		# print(support_set_y)
-		return support_x, torch.LongTensor(torch.from_numpy(support_y)), \
-		       query_x, torch.LongTensor(torch.from_numpy(query_y))
+
+
+		# now try to convert label from global indexing to local indexing.
+		# support_y: [n_way * k_shot]
+		# query_y: [n_way * k_query]
+		support_y_idx = np.array([i for i in range(self.n_way) for j in range(self.k_shot)])
+		query_y_idx = []
+		# for each value in query_y
+		for query_y_value in query_y:
+			# find the equal value index in support_y
+			for i in range(support_y.shape[0]):
+				if query_y_value == support_y[i]:
+					break
+			# use the index as the label info.
+			query_y_idx.append(support_y_idx[i])
+		query_y_idx = torch.from_numpy(np.array(query_y_idx))
+		support_y_idx = torch.from_numpy(np.array(support_y_idx))
+
+		# print('global indexing:')
+		# print(support_y, query_y)
+		# print('local indexing:')
+		# print(support_y_idx.numpy(), query_y_idx.numpy())
+
+		return support_x, support_y_idx, query_x, query_y_idx
 
 	def __len__(self):
 		# as we have built up to batchsz of sets, you can sample some small batch size of sets.

@@ -18,11 +18,14 @@ modify the value of `meta_batchsz` to fit your GPU memory size.
 | Matching Nets                       	| N         	| 98.1%         	| 98.9%         	| 93.8%        	| 98.5%         	|
 | Matching Nets                       	| Y         	| 97.9%         	| 98.7%         	| 93.5%        	| 98.7%         	|
 | MAML                                	| Y         	| 98.7+-0.4%    	| 99.9+-0.1%    	| 95.8+-0.3%   	| 98.9+-0.2%    	|
-| **Ours**                             	| Y         	| -    				| 99.52%        	| -   			| -    				|
+| **Ours**                             	| Y         	| 98.62%     		| 99.52%        	| 96.09%   		| 98.24%    				|
 
 
->5-way 5-shot episode: 27180*128 	finetune acc:0.995625 		test acc:0.995219
->
+>5way 1shot episode: 11580*512 	finetune acc:0.990234 		test acc:0.986250
+>5way 5shot episode: 27180\*128 	finetune acc:0.995625 		test acc:0.995219
+>20way 1shot episode: 23160\*128 	finetune acc:0.960937 		test acc:0.960898
+>20way 5shot episode: 11580*32 	finetune acc:0.985938 		test acc:0.982437
+
 
 ## training curve
 ![test acc](res/test-acc.png)

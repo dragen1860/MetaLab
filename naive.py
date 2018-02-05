@@ -30,6 +30,8 @@ class Naive(nn.Module):
 		                         nn.Conv2d(64, 64, kernel_size=3),
 		                         nn.BatchNorm2d(64),
 		                         nn.ReLU(inplace=True),
+
+		                         nn.MaxPool2d(5,3)
 		                         )
 
 		# dummy forward to get feature size
@@ -38,6 +40,7 @@ class Naive(nn.Module):
 		_, c, h, w = repsz
 		self.fc_dim = c * h * w
 
+
 		self.fc = nn.Sequential(nn.Linear(self.fc_dim, 64),
 		                        nn.ReLU(inplace=True),
 		                        nn.Linear(64, n_way))
@@ -45,7 +48,7 @@ class Naive(nn.Module):
 		self.criteon = nn.CrossEntropyLoss()
 
 		print(self)
-		print('Naive repnet sz:', self.fc_dim)
+		print('Naive repnet sz:', repsz)
 
 	def forward(self, x, target):
 		x = self.net(x)
