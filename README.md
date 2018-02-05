@@ -33,6 +33,8 @@ modify the value of `meta_batchsz` to fit your GPU memory size.
 
 # mini-Imagenet
 
+> train `mini-imagenet` is extremely slow, since the code train task one by one squentially.
+
 ## Howto
 
 download `mini-imagenet` dataset and make it looks like:
