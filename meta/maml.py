@@ -186,7 +186,7 @@ class MetaLearner(nn.Module):
 		:param query_y:   [meta_batchsz, querysz]
 		:return:
 		"""
-		sum_loss_pi = None
+		sum_loss_pi = 0
 		meta_batchsz = support_y.size(0)
 
 		# support_x[i]: [setsz, c_, h, w]
@@ -205,7 +205,7 @@ class MetaLearner(nn.Module):
 		dummy_loss, _ = self.learner.net_forward(support_x[0], support_y[0])
 		self.optimizer.zero_grad()
 		dummy_loss.backward(sum_loss_pi)
-		self.parameters().step()
+		self.optimizer.step()
 
 
 		return accs

@@ -1,3 +1,7 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
 from meta.maml import MetaLearner
 from mdl.naive import Naive
 from helper.MiniImagenet import MiniImagenet

@@ -1,4 +1,4 @@
-#  MetaLab
+#  MetaLab (NOT WORKING!!!)
 Universal Meta-Learning Library, with Pytorch GPU Accerleration.
 
 ## Algorithms
@@ -10,14 +10,14 @@ Currently supported meta-learning algorithms:
 
 
 
-# Ominiglot
+## Ominiglot
 
-## Howto
+### Howto
 ```
 python exp/run_omniglot.py
 ```
 
-## benchmark
+### benchmark
 | Model                               	| Fine Tune 	| 5-way Acc.    	|               	| 20-way Acc   	|               	|
 |-------------------------------------	|-----------	|---------------	|---------------	|--------------	|---------------	|
 |                                     	|           	| 1-shot        	| 5-shot        	| 1-shot       	| 5-shot        	|
@@ -29,15 +29,15 @@ python exp/run_omniglot.py
 
 
 
-## training curve
+### training curve
 ![test acc](res/test-acc.png)
 
 
 
-# mini-Imagenet
+## mini-Imagenet
 
 
-## Howto
+### Howto
 
 download `mini-imagenet` dataset and make it looks like:
 ```shell
@@ -63,7 +63,7 @@ and run:
 python exp/run_omniglot.py
 ```
 
-## benchmark
+### benchmark
 
 | Model                               | Fine Tune | 5-way Acc. |        | 20-way Acc |        |
 |-------------------------------------|-----------|------------|--------|------------|--------|

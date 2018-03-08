@@ -143,11 +143,12 @@ class MetaLearner(nn.Module):
 		:param meta_batchsz:
 		:return:
 		"""
-		# since we get sum of theta_pi, we just divide it by meta_batchsz
-		avg_theta_pi = sum_theta_pi / meta_batchsz
 
-		# grads = avg_theta_pi - theta
-		grads = avg_theta_pi - theta
+		# since we get sum of theta_pi, we just divide it by meta_batchsz
+		avg_theta_pi = [var / meta_batchsz for var in sum_theta_pi]
+
+		# grads = avg_theta_pi - theta for each variable
+		grads = [ i - j for i,j in zip(avg_theta_pi, theta)]
 
 		return grads
 

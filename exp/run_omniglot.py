@@ -1,5 +1,8 @@
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from helper.omniglotNShot import OmniglotNShot
-from meta.maml import MetaLearner
+from meta.reptile import MetaLearner
 from mdl.naive import Naive
 
 import torch
