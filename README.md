@@ -1,14 +1,21 @@
-#  MAML-Pytorch
-PyTorch implementation of the supervised learning experiments from the paper:
-Model-Agnostic Meta-Learning (MAML): https://arxiv.org/abs/1703.03400
+#  MetaLab
+Universal Meta-Learning Library, with Pytorch GPU Accerleration.
+
+## Algorithms
+Currently supported meta-learning algorithms:
+
+- Model-Agnostic Meta-Learning (MAML): https://arxiv.org/abs/1703.03400
+
+- Reptile: https://blog.openai.com/reptile/
 
 
 
 # Ominiglot
 
 ## Howto
-change `dataset = 'omniglot' ` in `main.py` and just run `python main.py`, the program will download omniglot dataset automatically.
-modify the value of `meta_batchsz` to fit your GPU memory size.
+```
+python exp/run_omniglot.py
+```
 
 ## benchmark
 | Model                               	| Fine Tune 	| 5-way Acc.    	|               	| 20-way Acc   	|               	|
@@ -21,23 +28,14 @@ modify the value of `meta_batchsz` to fit your GPU memory size.
 | **Ours**                             	| Y         	| 98.62%     		| 99.52%        	| 96.09%   		| 98.24%    				|
 
 
->5way 1shot episode: 11580\*512 	finetune acc:0.990234 		test acc:0.986250
-
->5way 5shot episode: 27180\*128 	finetune acc:0.995625 		test acc:0.995219
-
->20way 1shot episode: 23160\*128 	finetune acc:0.960937 		test acc:0.960898
-
->20way 5shot episode: 11580\*32 	finetune acc:0.985938 		test acc:0.982437
-
 
 ## training curve
 ![test acc](res/test-acc.png)
 
 
 
-# ~~mini-Imagenet~~ (CAN NOT WORK!)
+# mini-Imagenet
 
-> train `mini-imagenet` is extremely slow, since the code train task one by one squentially.
 
 ## Howto
 
@@ -60,7 +58,10 @@ MAML-Pytorch/
     ...  
 ```
 
-change `dataset = 'mini-imagenet' ` in `main.py` and just run `python main.py`.
+and run:
+```
+python exp/run_omniglot.py
+```
 
 ## benchmark
 

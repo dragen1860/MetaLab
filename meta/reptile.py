@@ -88,13 +88,6 @@ class Learner(nn.Module):
 		correct = torch.eq(indices, query_y).sum().data[0]
 		acc = correct / query_y.size(0)
 
-		# THE FOLLOWING CODE IS WRONG, THE GRADIENT IS RESPECT TO THETA_PI, NOT THETA.
-		# # gradient for validation on theta_pi
-		# # after call autorad.grad, you can not call backward again except for setting create_graph = True
-		# # as we will use the loss as dummpy loss to conduct a dummy backprop to write our gradients to theta network,
-		# # here we set create_graph to true to support second time backward.
-		# grads_pi = autograd.grad(loss, self.net_pi.parameters(), create_graph=True)
-
 		return loss, self.net_pi.parameters(), acc
 
 	def net_forward(self, support_x, support_y):
@@ -141,7 +134,25 @@ class MetaLearner(nn.Module):
 		# the optimizer is to update theta parameters, not theta_pi parameters.
 		self.optimizer = optim.Adam(self.learner.parameters(), lr=beta)
 
-	def write_grads(self, dummy_loss, sum_grads_pi):
+
+	def est_grads(self, sum_theta_pi, theta, meta_batchsz):
+		"""
+		estimate gradients of theta network update direction.
+		:param sum_theta_pi: sum of meta_batchsz of theta_pi network parameters
+		:param theta: theta network parameters
+		:param meta_batchsz:
+		:return:
+		"""
+		# since we get sum of theta_pi, we just divide it by meta_batchsz
+		avg_theta_pi = sum_theta_pi / meta_batchsz
+
+		# grads = avg_theta_pi - theta
+		grads = avg_theta_pi - theta
+
+		return grads
+
+
+	def write_grads(self, dummy_loss, grads):
 		"""
 		write loss into learner.net, gradients come from sum_grads_pi.
 		Since the gradients info is not calculated by general backward, we need this function to write the right gradients
@@ -157,8 +168,9 @@ class MetaLearner(nn.Module):
 
 		for i, v in enumerate(self.learner.parameters()):
 			def closure():
+				# TODO: why need ii = i?
 				ii = i
-				return lambda grad: sum_grads_pi[ii]
+				return lambda grad: grads[ii]
 
 			# if you write: hooks.append( v.register_hook(lambda grad : sum_grads_pi[i]) )
 			# it will pop an ERROR, i don't know why?
@@ -186,7 +198,7 @@ class MetaLearner(nn.Module):
 		:param query_y:   [meta_batchsz, querysz]
 		:return:
 		"""
-		sum_loss_pi = None
+		sum_theta_pi = None
 		meta_batchsz = support_y.size(0)
 
 		# support_x[i]: [setsz, c_, h, w]
@@ -194,19 +206,25 @@ class MetaLearner(nn.Module):
 		accs = []
 		# for each task/episode.
 		for i in range(meta_batchsz):
-			loss_pi, grad_pi, episode_acc = self.learner(support_x[i], support_y[i], query_x[i], query_y[i], self.num_updates)
+			_, theta_pi, episode_acc = self.learner(support_x[i], support_y[i], query_x[i], query_y[i], self.num_updates)
 			accs.append(episode_acc)
-			sum_loss_pi += loss_pi
+			if sum_theta_pi is None:
+				sum_theta_pi = theta_pi
+			else:  # accumulate all gradients from different episode learner
+				sum_theta_pi = [torch.add(i, j) for i, j in zip(sum_theta_pi, theta_pi)]
 
+		# we use simplified version to avoid calculating Hessian vector
+		# for more detail, pls refer to OpenAI Reptile: https://blog.openai.com/reptile/
+		grads = self.est_grads(sum_theta_pi, self.learner.parameters(), meta_batchsz)
 
-		# we already get the sum loss of several theta_pi networks,
-		# we just backward while set the gradent of root node as sum_loss_pi
-		# and the parameters will be updated as normal optimizer workflow.
+		# As we already have the grads to update
+		# We use a dummy forward / backward pass to get the correct grads into self.net
+		# the right grads will be updated by hook, ignoring backward.
+		# use hook mechnism to write sumed gradient into network.
+		# we need to update the theta/net network, we need a op from net network, so we call self.learner.net_forward
+		# to get the op from net network, since the loss from self.learner.forward will return loss from net_pi network.
 		dummy_loss, _ = self.learner.net_forward(support_x[0], support_y[0])
-		self.optimizer.zero_grad()
-		dummy_loss.backward(sum_loss_pi)
-		self.parameters().step()
-
+		self.write_grads(dummy_loss, grads)
 
 		return accs
 
